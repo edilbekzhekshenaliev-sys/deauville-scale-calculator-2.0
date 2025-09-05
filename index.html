@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расчетный калькулятор шкалы Довиль</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            max-width: 800px;
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+        .calculator {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        h1, h2 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        input[type="checkbox"] {
+            margin-right: 8px;
+            transform: scale(1.2);
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-weight: normal;
+        }
+        button {
+            background-color: #4f8cff;
+            color: white;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 15px;
+            width: 100%;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #3a75e0;
+        }
+        #result {
+            margin-top: 30px;
+            padding: 25px;
+            background-color: #e8f4ff;
+            border-left: 5px solid #4f8cff;
+            border-radius: 4px;
+            display: none;
+        }
+        .deauville-score {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        .interpretation {
+            font-weight: 600;
+            margin-top: 15px;
+        }
+        .note {
+            font-size: 0.9em;
+            color: #6c757d;
+            font-style: italic;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h1>Расчет шкалы Довиль (Deauville Scale)</h1>
+        <p>Введите значения SUV из отчета ПЭТ/КТ исследования для расчета оценки ответа на терапию.</p>
+
+        <div class="form-group">
+            <label for="suvLesion">SUV<sub>max</sub> в целевом очаге (лезии):</label>
+            <input type="number" id="suvLesion" min="0" step="0.1" placeholder="Например, 3.5">
+        </div>
+
+        <div class="form-group">
+            <label for="suvMediastinum">SUV<sub>max</sub> в средостенном кровеносном пуле (фоновый):</label>
+            <input type="number" id="suvMediastinum" min="0" step="0.1" placeholder="Например, 1.8">
+        </div>
+
+        <div class="form-group">
+            <label for="suvLiver">SUV<sub>max</sub> в правой доле печени (фоновый):</label>
+            <input type="number" id="suvLiver" min="0" step="0.1" placeholder="Например, 2.5">
+        </div>
+
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="noUptake">
+                Очаги не визуализируются (отсутствие патологического поглощения ФДГ)
+            </label>
+            <label class="checkbox-label">
+                <input type="checkbox" id="newLesions">
+                Появление новых очагов, связанных с лимфомой
+            </label>
+        </div>
+
+        <button onclick="calculateDeauville()">Рассчитать балл по шкале Довиль</button>
+
+        <div id="result">
+            <h2>Результат:</h2>
+            <div class="deauville-score">Оценка по шкале Довиль: <span id="scoreResult"></span></div>
+            <div id="scoreDefinition"></div>
+            <div class="interpretation" id="interpretationResult"></div>
+            <div class="note" id="calculationNote"></div>
+        </div>
+    </div>
+
+    <script>
+        function calculateDeauville() {
+            // Получаем значения из полей ввода
+            const suvLesion = parseFloat(document.getElementById('suvLesion').value);
+            const suvMediastinum = parseFloat(document.getElementById('suvMediastinum').value);
+            const suvLiver = parseFloat(document.getElementById('suvLiver').value);
+            const noUptakeChecked = document.getElementById('noUptake').checked;
+            const newLesionsChecked = document.getElementById('newLesions').checked;
+
+            // Проверяем, заполнены ли необходимые поля
+            if ((isNaN(suvLesion) || isNaN(suvMediastinum) || isNaN(suvLiver)) && !noUptakeChecked) {
+                alert('Пожалуйста, заполните все поля SUV или отметьте "Очаги не визуализируются".');
+                return;
+            }
+
+            let deauvilleScore = 0;
+            let scoreDefinition = "";
+            let interpretation = "";
+            let calculationNote = "Расчет основан на сравнении SUV очага с референсными значениями.";
+
+            const resultDiv = document.getElementById('result');
+            const scoreSpan = document.getElementById('scoreResult');
+            const definitionDiv = document.getElementById('scoreDefinition');
+            const interpretationDiv = document.getElementById('interpretationResult');
+            const noteDiv = document.getElementById('calculationNote');
+
+            // Логика расчета
+            if (newLesionsChecked) {
+                // Новые очаги автоматически дают 5 баллов
+                deauvilleScore = 5;
+                scoreDefinition = "Поглощение ФДГ в очагах значительно > поглощению в печени и/или появление новых очагов.";
+                interpretation = "<b>Отсутствие ответа/Прогрессирование заболевания.</b> Обсуждение тактики лечения (спасательная терапия, смена схемы лечения).";
+                calculationNote = "Оценка 5 баллов присвоена на основании появления новых очагов.";
+            } else if (noUptakeChecked) {
+                // Отсутствие поглощения
+                deauvilleScore = 1;
+                scoreDefinition = "Отсутствие патологического поглощения ФДГ в области исходных очагов.";
+                interpretation = "<b>Полный метаболический ответ.</b> Полная ремиссия по критериям Лугано. Рекомендуется наблюдение.";
+                calculationNote = "Оценка 1 балл присвоена на основании отсутствия визуализации очагов.";
+            } else {
+                // Расчет на основе числовых значений
+                if (suvLesion <= suvMediastinum) {
+                    deauvilleScore = 2;
+                    scoreDefinition = `Поглощение ФДГ в очаге (${suvLesion}) ≤ поглощению в средостенном пуле (${suvMediastinum}).`;
+                } else if (suvLesion > suvMediastinum && suvLesion <= suvLiver) {
+                    deauvilleScore = 3;
+                    scoreDefinition = `Поглощение ФДГ в очаге (${suvLesion}) > поглощению в средостенном пуле (${suvMediastinum}), но ≤ поглощению в печени (${suvLiver}).`;
+                } else if (suvLesion > suvLiver && suvLesion <= (2 * suvLiver)) {
+                    deauvilleScore = 4;
+                    scoreDefinition = `Поглощение ФДГ в очаге (${suvLesion}) умеренно > поглощению в печени (${suvLiver}).`;
+                } else {
+                    deauvilleScore = 5;
+                    scoreDefinition = `Поглощение ФДГ в очаге (${suvLesion}) значительно > поглощению в печени (${suvLiver}).`;
+                }
+
+                // Интерпретация для числового расчета
+                switch(deauvilleScore) {
+                    case 2:
+                    case 3:
+                        interpretation = "<b>Полный метаболический ответ.</b> Полная ремиссия по критериям Лугано. Рекомендуется наблюдение.";
+                        break;
+                    case 4:
+                        interpretation = "<b>Неполный метаболический ответ.</b> Резидуальная метаболическая активность неясного значения. Необходимо сопоставление с клинической картиной, данными КТ и/или биопсии.";
+                        break;
+                    case 5:
+                        interpretation = "<b>Отсутствие ответа/Прогрессирование заболевания.</b> Обсуждение тактики лечения (спасательная терапия, смена схемы лечения).";
+                        break;
+                }
+            }
+
+            // Вывод результата
+            scoreSpan.textContent = deauvilleScore;
+            definitionDiv.textContent = scoreDefinition;
+            interpretationDiv.innerHTML = interpretation;
+            noteDiv.textContent = calculationNote;
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
